@@ -1,0 +1,11 @@
+dist/*.exe
+dist/*.zip
+dist/SHA256.txt
+dist/test-error.txt
+fixtures/
+test-output/
+integration-game/
+legacy-game/
+Backups/
+.quest-custom-patch/
+*.tmp
