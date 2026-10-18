@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Linq;
 using System.Collections.Generic;
@@ -12,7 +12,7 @@ using System.Reflection;
 
 public class Op { public int offset; public int remove; public string data; public int any; }
 public class Variant { public Op[] ops; public string hash; }
-public class FileRecipe { public string path,hash; public int length,mask; public Op[] ops; public Dictionary<string,Variant> variants; }
+public class FileRecipe { public string path,hash,sourcePath,adoptHash; public bool optional; public int length,mask; public Op[] ops; public Dictionary<string,Variant> variants; }
 public class Legacy { public string path,hash; public Op[] ops; }
 public class Feature { public string id,label; public int bit; }
 public class Payload { public string version,backupFolder; public Feature[] features; public FileRecipe[] files; public Legacy[] legacy; public Payload[] profiles; }
@@ -56,6 +56,7 @@ public class Engine {
     }
     public byte[] Build(FileRecipe f,byte[] source,int mask) {
         if(Hash(source)!=f.hash) throw new Exception("Повреждена исходная резервная копия: "+f.path);
+        if(f.optional && (mask&f.mask)==0)return null;
         if(mask==0) return source;
         if(f.variants!=null) {
             var v=f.variants[(mask&f.mask).ToString()];var b=Edit(source,v.ops);
@@ -82,17 +83,22 @@ public class Engine {
         var s=LoadState(root); bool stock=true,legacy=true;
         foreach(var f in P.files) {
             string path=FilePath(root,f.path);
-            if(!File.Exists(path)) throw new Exception("Не найден файл: "+f.path+"\nСначала установите VR-мод через CircuitLordVRModInstaller.");
-            string h=Hash(File.ReadAllBytes(path));
+            if(!File.Exists(path) && !f.optional) throw new Exception("Не найден файл: "+f.path+"\nСначала установите VR-мод через CircuitLordVRModInstaller.");
+            string h=File.Exists(path)?Hash(File.ReadAllBytes(path)):null;
+            if(f.optional && s!=null && !s.current.ContainsKey(f.path)) {
+                if(h!=null&&h!=f.adoptHash)throw new Exception("Неизвестный дополнительный скрипт: "+f.path);
+                s.current[f.path]=h;if(s.initial!=null)s.initial[f.path]=null;
+            }
             if(s!=null) { if(!s.current.ContainsKey(f.path)||h!=s.current[f.path]) throw new Exception("Файл изменён после установки патча: "+f.path+"\nВозможно, VR-мод обновился. Запись остановлена; резервные копии сохранены."); }
-            stock &= h==f.hash;var prior=(P.legacy??new Legacy[0]).FirstOrDefault(x=>x.path==f.path);legacy &= prior!=null&&h==prior.hash;
+            stock &= f.optional?h==null:h==f.hash;var prior=(P.legacy??new Legacy[0]).FirstOrDefault(x=>x.path==f.path);legacy &= f.optional?h==null:prior!=null&&h==prior.hash;
         }
         if(s!=null) {
-            foreach(var f in P.files) if(Hash(File.ReadAllBytes(FilePath(root,BackupRel("baseline/"+f.path))))!=f.hash) throw new Exception("Повреждена резервная копия.");
+            foreach(var f in P.files) {string bp=FilePath(root,BackupRel("baseline/"+f.path));if(f.optional&&!File.Exists(bp)){if(Hash(File.ReadAllBytes(FilePath(root,f.sourcePath)))!=f.hash)throw new Exception("Неизвестная исходная версия скрипта комплектов титана.");}else if(Hash(File.ReadAllBytes(bp))!=f.hash) throw new Exception("Повреждена резервная копия.");}
             return s;
         }
-        if(!stock&&!legacy) throw new Exception("Эта сборка VR-мода не поддерживается. Требуются проверенные исходные файлы Titanfall 2 VR 1.0.13 или 1.0.14.\nПатч не изменяет неизвестные DLL и скрипты.");
-        return new State { mask=legacy?511:0,imported=legacy,current=P.files.ToDictionary(x=>x.path,x=>Hash(File.ReadAllBytes(FilePath(root,x.path)))) };
+        if(!stock&&!legacy) throw new Exception("Эта сборка VR-мода не поддерживается. Требуются проверенные исходные файлы Titanfall 2 VR 1.0.13, 1.0.14 или 1.0.17.\nПатч не изменяет неизвестные DLL и скрипты.");
+        foreach(var f in P.files.Where(x=>x.optional))if(Hash(File.ReadAllBytes(FilePath(root,f.sourcePath)))!=f.hash)throw new Exception("Неизвестная исходная версия скрипта комплектов титана.");
+        return new State { mask=legacy?511:0,imported=legacy,current=P.files.ToDictionary(x=>x.path,x=>File.Exists(FilePath(root,x.path))?Hash(File.ReadAllBytes(FilePath(root,x.path))):null) };
     }
     void ClosedGame() {
         foreach(var p in Process.GetProcesses()) { try { string n=p.ProcessName.ToLowerInvariant(); if(n=="titanfall2"||n=="northstar"||n=="titanfall2vr")throw new InvalidOperationException("Закройте игру перед изменением файлов."); } finally { p.Dispose(); } }
@@ -101,8 +107,10 @@ public class Engine {
         ClosedGame();root=Path.GetFullPath(root);
         // Reload on Trigger must free the same Trigger's pilot ability binding.
         if((mask&1)!=0 && (mask&2)==0) throw new Exception("Для перезарядки на левом Trigger включите перенос способности пилота на L3.");
-        if(mask<0||mask>511)throw new Exception("Неверный набор функций.");
         var s=Check(root);
+        int supported=P.features.Aggregate(0,(bits,f)=>bits|f.bit);
+        if(mask<0||(mask&~supported)!=0)throw new Exception("Эти функции не поддерживаются выбранной версией VR-мода.");
+        if((mask&1024)!=0&&(mask&128)==0)throw new Exception("Для случайного оружия включите обмен оружия в кобурах на B.");
         string dir=FilePath(root,BackupRel());Directory.CreateDirectory(dir);
         using(var gate=new FileStream(FilePath(root,BackupRel("lock")),FileMode.OpenOrCreate,FileAccess.ReadWrite,FileShare.None)) {
             s=Check(root);
@@ -111,26 +119,29 @@ public class Engine {
                 string bp=FilePath(root,BackupRel("baseline/"+f.path));
                 byte[] b;
                 if(LoadState(root)==null) {
-                    b=File.ReadAllBytes(FilePath(root,f.path));
+                    bool present=File.Exists(FilePath(root,f.path));
+                    b=File.ReadAllBytes(FilePath(root,f.optional?f.sourcePath:f.path));
                     var initialPath=FilePath(root,BackupRel("initial/"+f.path));Directory.CreateDirectory(Path.GetDirectoryName(initialPath));
                     if(File.Exists(initialPath) && Hash(File.ReadAllBytes(initialPath))!=s.current[f.path])throw new Exception("Обнаружена предыдущая резервная копия. Не удаляйте её; установка остановлена.");
-                    if(!File.Exists(initialPath))File.WriteAllBytes(initialPath,b);
-                    if(s.imported)b=Edit(b,P.legacy.First(x=>x.path==f.path).ops);
+                    if(present&&!File.Exists(initialPath))File.WriteAllBytes(initialPath,File.ReadAllBytes(FilePath(root,f.path)));
+                    if(s.imported&&!f.optional)b=Edit(b,P.legacy.First(x=>x.path==f.path).ops);
                     if(Hash(b)!=f.hash)throw new Exception("Не удалось восстановить исходную версию.");
                     Directory.CreateDirectory(Path.GetDirectoryName(bp));
                     if(File.Exists(bp)&&Hash(File.ReadAllBytes(bp))!=f.hash)throw new Exception("Резервная копия повреждена.");
                     if(!File.Exists(bp))File.WriteAllBytes(bp,b);
-                } else b=File.ReadAllBytes(bp);
+                } else {if(f.optional&&!File.Exists(bp)){b=File.ReadAllBytes(FilePath(root,f.sourcePath));if(Hash(b)!=f.hash)throw new Exception("Неизвестная исходная версия скрипта.");Directory.CreateDirectory(Path.GetDirectoryName(bp));File.WriteAllBytes(bp,b);}else b=File.ReadAllBytes(bp);}
                 bases[f.path]=b;
             }
             if(s.initial==null)s.initial=new Dictionary<string,string>(s.current);
             var output=P.files.ToDictionary(f=>f.path,f=>Build(f,bases[f.path],mask));
-            s.mask=mask;s.current=output.ToDictionary(x=>x.Key,x=>Hash(x.Value));
+            s.mask=mask;s.current=output.ToDictionary(x=>x.Key,x=>x.Value==null?null:Hash(x.Value));
             output[BackupRel("state.json")]=Encoding.UTF8.GetBytes(Json.Serialize(s));
             Transaction(root,output);
         }
     }
     static void Atomic(string path,byte[] bytes) {
+        Directory.CreateDirectory(Path.GetDirectoryName(path));
+        if(bytes==null){if(File.Exists(path))File.Delete(path);return;}
         string tmp=path+".quest-"+Guid.NewGuid().ToString("N")+".tmp";
         try { using(var s=new FileStream(tmp,FileMode.CreateNew,FileAccess.Write,FileShare.None)){s.Write(bytes,0,bytes.Length);s.Flush(true);} if(File.Exists(path))File.Replace(tmp,path,null);else File.Move(tmp,path); }
         finally { if(File.Exists(tmp))File.Delete(tmp); }
@@ -145,7 +156,7 @@ public class Engine {
         try {
             foreach(var pair in output) {
                 string path=FilePath(root,pair.Key);Atomic(path,pair.Value);
-                if(Hash(File.ReadAllBytes(path))!=Hash(pair.Value))throw new Exception("Не удалось проверить записанный файл.");
+                if(pair.Value==null?File.Exists(path):Hash(File.ReadAllBytes(path))!=Hash(pair.Value))throw new Exception("Не удалось проверить записанный файл.");
             }
             Directory.Delete(pending,true);
         } catch { Recover(root);throw; }
@@ -155,7 +166,8 @@ public class Engine {
         if(!File.Exists(journal))throw new Exception("Отсутствует журнал восстановления. Файлы не перезаписаны.");
         var before=Json.Deserialize<Dictionary<string,string>>(File.ReadAllText(journal));
         var allowed=new HashSet<string>(P.files.Select(f=>f.path));allowed.Add(BackupRel("state.json"));
-        if(before.Count!=allowed.Count||before.Keys.Any(k=>!allowed.Contains(k)))throw new Exception("Некорректный журнал восстановления.");
+        var required=new HashSet<string>(P.files.Where(f=>!f.optional).Select(f=>f.path));required.Add(BackupRel("state.json"));
+        if(before.Keys.Any(k=>!allowed.Contains(k))||required.Any(k=>!before.ContainsKey(k)))throw new Exception("Некорректный журнал восстановления.");
         foreach(var p in before) { string path=FilePath(root,p.Key);if(p.Value==null){if(File.Exists(path))File.Delete(path);}else Atomic(path,Convert.FromBase64String(p.Value)); }
         Directory.Delete(pending,true);
     }
@@ -166,7 +178,7 @@ public class Engine {
             if(Directory.Exists(FilePath(root,BackupRel("pending")))){Recover(root);return;}
             var s=Check(root);if(s.initial==null)throw new Exception("Нет установленного патча.");
             var output=new Dictionary<string,byte[]>();
-            foreach(var f in P.files) {var b=File.ReadAllBytes(FilePath(root,BackupRel("initial/"+f.path)));if(Hash(b)!=s.initial[f.path])throw new Exception("Повреждена исходная копия.");output[f.path]=b;}
+            foreach(var f in P.files) {byte[] b=s.initial[f.path]==null?null:File.ReadAllBytes(FilePath(root,BackupRel("initial/"+f.path)));if((b==null?null:Hash(b))!=s.initial[f.path])throw new Exception("Повреждена исходная копия.");output[f.path]=b;}
             s.current=new Dictionary<string,string>(s.initial);s.mask=s.imported?511:0;
             output[BackupRel("state.json")]=Encoding.UTF8.GetBytes(Json.Serialize(s));Transaction(root,output);
         }
@@ -176,16 +188,16 @@ public class Engine {
 public class MainWindow:Form {
     Engine engine=new Engine();TextBox folder=new TextBox();CheckedListBox options=new CheckedListBox();Label status=new Label();Button apply=new Button(),restore=new Button(); bool updating;
     public MainWindow() {
-        Text="Titanfall 2 VR • Quest Custom Patch";ClientSize=new Size(740,580);MinimumSize=MaximumSize=Size;FormBorderStyle=FormBorderStyle.FixedSingle;MaximizeBox=false;StartPosition=FormStartPosition.CenterScreen;Font=new Font("Segoe UI",10);BackColor=Color.FromArgb(245,247,250);
+        Text="Titanfall 2 VR — Апдейт управления v1.2.0";ClientSize=new Size(740,580);MinimumSize=MaximumSize=Size;FormBorderStyle=FormBorderStyle.FixedSingle;MaximizeBox=false;StartPosition=FormStartPosition.CenterScreen;Font=new Font("Segoe UI",10);BackColor=Color.FromArgb(245,247,250);
         Controls.Add(new Label{Text="Titanfall 2 VR — удобное управление",Font=new Font("Segoe UI",17,FontStyle.Bold),Location=new Point(22,18),Size=new Size(690,40)});
-        Controls.Add(new Label{Text="Патчер 1.1.1 • VR-мод 1.0.13 / 1.0.14 • Quest 3 / Touch",Location=new Point(24,64),Size=new Size(690,25)});
+        Controls.Add(new Label{Text="Патчер 1.2.0 • VR-мод 1.0.13 / 1.0.14 / 1.0.17 • Quest 3 / Touch",Location=new Point(24,64),Size=new Size(690,25)});
         folder.SetBounds(24,105,577,28);folder.Text=Directory.Exists(@"D:\SteamLibrary\steamapps\common\Titanfall2")?@"D:\SteamLibrary\steamapps\common\Titanfall2":"";Controls.Add(folder);
         var browse=new Button{Text="Папка игры…",Location=new Point(610,103),Size=new Size(106,31)};browse.Click+=(s,e)=>{using(var d=new FolderBrowserDialog{Description="Выберите папку Titanfall2",SelectedPath=folder.Text})if(d.ShowDialog()==DialogResult.OK){folder.Text=d.SelectedPath;Inspect();}};Controls.Add(browse);
         options.SetBounds(24,150,692,245);options.CheckOnClick=true;options.BorderStyle=BorderStyle.FixedSingle;options.BackColor=Color.White;
         foreach(var f in engine.P.features)options.Items.Add(f.label,true);
-        options.ItemCheck+=(s,e)=>{if(updating)return;updating=true;try {if(e.Index==0&&e.NewValue==CheckState.Checked)options.SetItemChecked(1,true);if(e.Index==1&&e.NewValue==CheckState.Unchecked)options.SetItemChecked(0,false);}finally{updating=false;}};
+        options.ItemCheck+=(s,e)=>{if(updating)return;updating=true;try {if(e.Index==0&&e.NewValue==CheckState.Checked)options.SetItemChecked(1,true);if(e.Index==1&&e.NewValue==CheckState.Unchecked)options.SetItemChecked(0,false);if(options.Items.Count>9){if(e.Index==9&&e.NewValue==CheckState.Checked)options.SetItemChecked(5,false);if(e.Index==5&&e.NewValue==CheckState.Checked)options.SetItemChecked(9,false);if(e.Index==10&&e.NewValue==CheckState.Checked)options.SetItemChecked(7,true);if(e.Index==7&&e.NewValue==CheckState.Unchecked)options.SetItemChecked(10,false);}}finally{updating=false;}};
         Controls.Add(options);
-        Controls.Add(new Label{Text="Титан: Grip + Trigger — способность 1; + A — 2; + B — 3; + R3 — ядро.\nОбмен на B: оба оружия убраны, руки пустые, другие кнопки отпущены.\nРезервные копии сохраняются в папке игры. Перед применением закройте игру.",Location=new Point(24,404),Size=new Size(692,66)});
+        Controls.Add(new Label{Text="Титан: Grip + Trigger — способность 1; + A — 2; + B — 3; + L3 — ядро; + правый Trigger — удар.\nОбмен на B: оба оружия убраны, руки пустые, другие кнопки отпущены.\nРезервные копии сохраняются в папке игры. Перед применением закройте игру.",Location=new Point(24,404),Size=new Size(692,66)});
         status.SetBounds(24,475,692,45);status.ForeColor=Color.FromArgb(60,80,100);Controls.Add(status);
         apply.Text="Применить выбранное";apply.SetBounds(24,528,220,34);apply.Click+=(s,e)=>Run(()=>{int mask=0;for(int i=0;i<options.Items.Count;i++)if(options.GetItemChecked(i))mask|=engine.P.features[i].bit;engine.Apply(folder.Text,mask);status.Text="Готово. Выбранные изменения установлены; файлы проверены.";});Controls.Add(apply);
         restore.Text="Восстановить";restore.SetBounds(256,528,160,34);restore.Click+=(s,e)=>Run(()=>{engine.Restore(folder.Text);Inspect();status.Text="Восстановлены файлы до первого применения этого патча.";});Controls.Add(restore);
@@ -193,7 +205,7 @@ public class MainWindow:Form {
         Shown+=(s,e)=>Inspect();
     }
     void Run(Action action) {try{apply.Enabled=restore.Enabled=false;UseWaitCursor=true;action();}catch(Exception ex){status.Text="Изменения не применены.";MessageBox.Show(this,ex.Message,"Quest Custom Patch",MessageBoxButtons.OK,MessageBoxIcon.Warning);}finally{UseWaitCursor=false;apply.Enabled=restore.Enabled=true;}}
-    void Inspect() {try{var s=engine.Check(folder.Text);bool fresh=s.mask==0&&!File.Exists(Path.Combine(engine.Backup(folder.Text),"state.json"));updating=true;for(int i=0;i<options.Items.Count;i++)options.SetItemChecked(i,fresh||(s.mask&engine.P.features[i].bit)!=0);updating=false;status.Text="Найдена VR "+engine.P.version+". "+(s.imported?"Импорт предыдущих изменений доступен.":"Выберите нужные изменения.");apply.Enabled=true;}catch(Exception ex){updating=false;status.Text=ex.Message.Split('\n')[0];apply.Enabled=false;}}
+    void Inspect() {try{var s=engine.Check(folder.Text);bool fresh=s.mask==0&&!File.Exists(Path.Combine(engine.Backup(folder.Text),"state.json"));updating=true;options.Items.Clear();foreach(var f in engine.P.features)options.Items.Add(f.label,(fresh&&f.bit!=1024&&f.bit!=512)||(s.mask&f.bit)!=0);updating=false;status.Text="Найдена VR "+engine.P.version+". "+(s.imported?"Импорт предыдущих изменений доступен.":"Выберите нужные изменения.");apply.Enabled=true;}catch(Exception ex){updating=false;status.Text=ex.Message.Split('\n')[0];apply.Enabled=false;}}
 }
 
 public static class Program {
@@ -202,9 +214,9 @@ public static class Program {
             var engine=new Engine();
             if(args.Length>0&&args[0]=="--build-test") {
                 string fixtures=args[1],output=args[2];engine.Select(fixtures);Directory.CreateDirectory(output);
-                for(int mask=0;mask<512;mask++)foreach(var f in engine.P.files) {
-                    byte[] source=File.ReadAllBytes(Path.Combine(fixtures,f.path));var b=engine.Build(f,source,mask);
-                    if(mask==511){string p=Path.Combine(output,f.path);Directory.CreateDirectory(Path.GetDirectoryName(p));File.WriteAllBytes(p,b);}
+                for(int mask=0;mask<(1<<engine.P.features.Length);mask++)foreach(var f in engine.P.files) {
+                    byte[] source=File.ReadAllBytes(Path.Combine(fixtures,f.optional?f.sourcePath:f.path));var b=engine.Build(f,source,mask);
+                    if(mask==((1<<engine.P.features.Length)-1)&&b!=null){string p=Path.Combine(output,f.path);Directory.CreateDirectory(Path.GetDirectoryName(p));File.WriteAllBytes(p,b);}
                 }
                 return 0;
             }
