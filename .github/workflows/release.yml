@@ -20,7 +20,7 @@ jobs:
           $hash = (Get-FileHash -LiteralPath dist/Titanfall2VR-QuestPatch.exe -Algorithm SHA256).Hash.ToLowerInvariant()
           Set-Content -LiteralPath dist/SHA256.txt -Value "$hash  Titanfall2VR-QuestPatch.exe" -Encoding ascii
           Compress-Archive -LiteralPath dist/Titanfall2VR-QuestPatch.exe,dist/README.txt,dist/SHA256.txt -DestinationPath dist/Titanfall2VR-QuestPatch.zip
-      - name: Publish release if it does not exist
+      - name: Publish or replace release assets
         env:
           GH_TOKEN: ${{ github.token }}
         shell: pwsh
@@ -28,9 +28,12 @@ jobs:
           $tag = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME } else { 'v1.3.0' }
           gh release view $tag --repo $env:GITHUB_REPOSITORY *> $null
           if ($LASTEXITCODE -eq 0) {
-            Write-Output "Release $tag already exists; keeping its published files unchanged."
-            exit 0
+            gh api --method PATCH "repos/$env:GITHUB_REPOSITORY/git/refs/tags/$tag" -f "sha=$env:GITHUB_SHA" -F "force=true"
+            if ($LASTEXITCODE -ne 0) { throw 'Could not update the release source tag.' }
+            gh release upload $tag dist/Titanfall2VR-QuestPatch.exe dist/Titanfall2VR-QuestPatch.zip dist/README.txt dist/SHA256.txt --repo $env:GITHUB_REPOSITORY --clobber
+            if ($LASTEXITCODE -ne 0) { throw 'Could not replace release assets.' }
+            gh release edit $tag --repo $env:GITHUB_REPOSITORY --title "Titanfall 2 VR Апдейт управления $tag" --notes-file RELEASE_NOTES.md
+          } else {
+            gh release create $tag dist/Titanfall2VR-QuestPatch.exe dist/Titanfall2VR-QuestPatch.zip dist/README.txt dist/SHA256.txt --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "Titanfall 2 VR Апдейт управления $tag" --notes-file RELEASE_NOTES.md
           }
-          gh release create $tag dist/Titanfall2VR-QuestPatch.exe dist/Titanfall2VR-QuestPatch.zip dist/README.txt dist/SHA256.txt --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "Titanfall 2 VR Апдейт управления $tag" --notes-file RELEASE_NOTES.md
           if ($LASTEXITCODE -ne 0) { throw 'Release publication failed.' }
-

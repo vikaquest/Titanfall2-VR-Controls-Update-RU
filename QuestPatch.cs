@@ -217,34 +217,50 @@ public static class Words {
     }
     public static Dictionary<string,string> Errors=new Dictionary<string,string>();
 }
-public class FeatureRow:Panel {
-    public CheckBox Box=new CheckBox(); public Label Caption=new Label(); public Feature Feature; public FeatureCopy Copy;
+public static class Theme {
+    public static Color Background=Color.FromArgb(17,23,29),Card=Color.FromArgb(25,34,43),Text=Color.FromArgb(229,237,243),Muted=Color.FromArgb(168,184,199),Border=Color.FromArgb(52,69,85),Accent=Color.FromArgb(104,188,232),Selected=Color.FromArgb(32,57,73);
+    public static System.Drawing.Drawing2D.GraphicsPath Round(RectangleF r,float radius){var p=new System.Drawing.Drawing2D.GraphicsPath();float d=radius*2;p.AddArc(r.X,r.Y,d,d,180,90);p.AddArc(r.Right-d,r.Y,d,d,270,90);p.AddArc(r.Right-d,r.Bottom-d,d,d,0,90);p.AddArc(r.X,r.Bottom-d,d,d,90,90);p.CloseFigure();return p;}
+}
+public class DarkCheckBox:CheckBox {
+    public DarkCheckBox(){SetStyle(ControlStyles.UserPaint|ControlStyles.AllPaintingInWmPaint|ControlStyles.OptimizedDoubleBuffer,true);Cursor=Cursors.Hand;}
+    protected override void OnPaint(PaintEventArgs e){e.Graphics.Clear(Parent.BackColor);e.Graphics.SmoothingMode=System.Drawing.Drawing2D.SmoothingMode.AntiAlias;var r=new RectangleF(1,1,16,16);using(var p=Theme.Round(r,2))using(var brush=new SolidBrush(Checked?Theme.Accent:Theme.Card))using(var pen=new Pen(Theme.Border)){e.Graphics.FillPath(brush,p);if(!Checked)e.Graphics.DrawPath(pen,p);}if(Checked)using(var pen=new Pen(Theme.Background,2.3f)){e.Graphics.DrawLines(pen,new PointF[]{new PointF(4,9),new PointF(7,12),new PointF(14,5)});}if(Focused)ControlPaint.DrawFocusRectangle(e.Graphics,new Rectangle(0,0,19,19),Theme.Accent,Parent.BackColor);}
+}
+public class DarkCard:Panel {
+    public Color Stroke=Theme.Border;
+    public DarkCard(){DoubleBuffered=true;BackColor=Theme.Card;}
+    protected override void OnPaintBackground(PaintEventArgs e){e.Graphics.Clear(Parent==null?Theme.Background:Parent.BackColor);}
+    protected override void OnPaint(PaintEventArgs e){e.Graphics.SmoothingMode=System.Drawing.Drawing2D.SmoothingMode.AntiAlias;using(var p=Theme.Round(new RectangleF(0.5f,0.5f,Width-1,Height-1),7))using(var brush=new SolidBrush(BackColor))using(var pen=new Pen(Stroke)){e.Graphics.FillPath(brush,p);e.Graphics.DrawPath(pen,p);}base.OnPaint(e);}
+}
+public class FeatureRow:DarkCard {
+    public CheckBox Box=new DarkCheckBox(); public Label Caption=new Label(); public Feature Feature; public FeatureCopy Copy;
     public bool Selected; public event EventHandler Pick;
     public FeatureRow(Feature f,FeatureCopy copy){
-        Feature=f;Copy=copy;Height=43;Margin=new Padding(0,0,0,6);BackColor=Color.White;
-        Box.SetBounds(13,12,20,20);Box.Checked=true;Box.AccessibleName=Words.T(copy.title,copy.titleEn);Controls.Add(Box);
-        Caption.Text=Words.T(copy.title,copy.titleEn);Caption.SetBounds(42,2,302,39);Caption.TextAlign=ContentAlignment.MiddleLeft;Caption.Font=new Font("Segoe UI",9.5f);Caption.Cursor=Cursors.Hand;Controls.Add(Caption);
+        Feature=f;Copy=copy;Height=40;Margin=new Padding(0,0,0,3);BackColor=Theme.Card;
+        Box.SetBounds(13,10,20,20);Box.Checked=true;Box.AccessibleName=Words.T(copy.title,copy.titleEn);Controls.Add(Box);
+        Caption.Text=Words.T(copy.title,copy.titleEn);Caption.SetBounds(42,1,302,38);Caption.TextAlign=ContentAlignment.MiddleLeft;Caption.Font=new Font("Segoe UI",9.5f);Caption.ForeColor=Theme.Text;Caption.BackColor=Color.Transparent;Caption.Cursor=Cursors.Hand;Controls.Add(Caption);
         Caption.Click+=(s,e)=>{if(Pick!=null)Pick(this,EventArgs.Empty);};Click+=(s,e)=>{if(Pick!=null)Pick(this,EventArgs.Empty);};Box.Enter+=(s,e)=>{if(Pick!=null)Pick(this,EventArgs.Empty);};
     }
-    protected override void OnPaint(PaintEventArgs e){base.OnPaint(e);using(var pen=new Pen(Selected?Color.FromArgb(30,112,156):Color.FromArgb(214,224,232),Selected?2:1))e.Graphics.DrawRectangle(pen,0,0,Width-1,Height-1);}
+    protected override void OnPaint(PaintEventArgs e){Stroke=Selected?Theme.Accent:Theme.Border;base.OnPaint(e);}
 }
 public class MainWindow:Form {
-    Engine engine=new Engine(); TextBox folder=new TextBox(); Panel list=new Panel(),detail=new Panel(); Label status=new Label(),count=new Label(),heading=new Label(),description=new Label(),conditions=new Label(),section=new Label(); FlowLayoutPanel bindings=new FlowLayoutPanel();
+    Engine engine=new Engine(); TextBox folder=new TextBox(); Panel list=new Panel(); DarkCard detail=new DarkCard(); Label status=new Label(),count=new Label(),heading=new Label(),description=new Label(),conditions=new Label(),section=new Label(); FlowLayoutPanel bindings=new FlowLayoutPanel();
     Button apply=new Button(),restore=new Button(); List<FeatureRow> rows=new List<FeatureRow>(); List<FeatureCopy> copies; bool updating; string selectedId;
-    Color ink=Color.FromArgb(23,43,61),muted=Color.FromArgb(78,99,117),accent=Color.FromArgb(25,103,145),line=Color.FromArgb(213,224,232);
+    Color ink=Theme.Text,muted=Theme.Muted,accent=Theme.Accent,line=Theme.Border;
+    [System.Runtime.InteropServices.DllImport("dwmapi.dll")]static extern int DwmSetWindowAttribute(IntPtr window,int attr,ref int value,int size);
+    protected override void OnHandleCreated(EventArgs e){base.OnHandleCreated(e);try{int enabled=1;DwmSetWindowAttribute(Handle,20,ref enabled,4);}catch{}}
     public MainWindow(){
         using(var s=Assembly.GetExecutingAssembly().GetManifestResourceStream("features.json"))using(var r=new StreamReader(s,Encoding.UTF8))copies=Engine.Json.Deserialize<List<FeatureCopy>>(r.ReadToEnd());
         using(var s=Assembly.GetExecutingAssembly().GetManifestResourceStream("messages.json"))using(var r=new StreamReader(s,Encoding.UTF8))Words.Errors=Engine.Json.Deserialize<Dictionary<string,string>>(r.ReadToEnd());
-        Text=Words.T("Titanfall 2 VR — Апдейт управления v1.3.0","Titanfall 2 VR — Controls Update v1.3.0");ClientSize=new Size(1120,860);MinimumSize=MaximumSize=Size;FormBorderStyle=FormBorderStyle.FixedSingle;MaximizeBox=false;StartPosition=FormStartPosition.CenterScreen;Font=new Font("Segoe UI",10);BackColor=Color.FromArgb(244,247,249);ForeColor=ink;AutoScaleMode=AutoScaleMode.None;
+        Text=Words.T("Titanfall 2 VR — Апдейт управления v1.3.0","Titanfall 2 VR — Controls Update v1.3.0");ClientSize=new Size(1120,860);MinimumSize=MaximumSize=Size;FormBorderStyle=FormBorderStyle.FixedSingle;MaximizeBox=false;StartPosition=FormStartPosition.CenterScreen;Font=new Font("Segoe UI",10);BackColor=Theme.Background;ForeColor=ink;AutoScaleMode=AutoScaleMode.None;
         var title=new Label{Text="Titanfall 2 VR",Font=new Font("Segoe UI",24,FontStyle.Bold),Location=new Point(28,17),Size=new Size(600,45),ForeColor=ink};Controls.Add(title);
         Controls.Add(new Label{Text=Words.T("Апдейт управления 1.3.0  /  Quest & Touch","Controls Update 1.3.0  /  Quest & Touch"),Location=new Point(31,66),Size=new Size(1000,24),ForeColor=muted});
-        folder.SetBounds(31,103,920,28);folder.Text=Directory.Exists(@"D:\SteamLibrary\steamapps\common\Titanfall2")?@"D:\SteamLibrary\steamapps\common\Titanfall2":"";Controls.Add(folder);
+        folder.BackColor=Theme.Card;folder.ForeColor=Theme.Text;folder.BorderStyle=BorderStyle.FixedSingle;folder.SetBounds(31,103,920,28);folder.Text=Directory.Exists(@"D:\SteamLibrary\steamapps\common\Titanfall2")?@"D:\SteamLibrary\steamapps\common\Titanfall2":"";Controls.Add(folder);
         var browse=MakeButton(Words.T("Папка игры…","Game folder…"),962,100,127,false);browse.Click+=(s,e)=>{using(var d=new FolderBrowserDialog{Description=Words.T("Выберите папку Titanfall2","Select your Titanfall2 folder"),SelectedPath=folder.Text})if(d.ShowDialog()==DialogResult.OK){folder.Text=d.SelectedPath;Inspect();}};
         Controls.Add(new Label{Text=Words.T("ВОЗМОЖНОСТИ","FEATURES"),Location=new Point(31,150),Size=new Size(353,22),ForeColor=muted,Font=new Font("Segoe UI",9,FontStyle.Bold)});
         list.SetBounds(31,180,366,565);list.AutoScroll=true;Controls.Add(list);
-        detail.SetBounds(415,150,674,595);detail.BackColor=Color.White;detail.Paint+=(s,e)=>{using(var pen=new Pen(line))e.Graphics.DrawRectangle(pen,0,0,detail.Width-1,detail.Height-1);};Controls.Add(detail);
+        detail.SetBounds(415,150,674,595);detail.BackColor=Theme.Card;Controls.Add(detail);
         section.SetBounds(27,23,614,24);section.ForeColor=accent;section.Font=new Font("Segoe UI",10,FontStyle.Bold);detail.Controls.Add(section);
-        heading.SetBounds(27,59,615,96);heading.Font=new Font("Segoe UI",23,FontStyle.Bold);detail.Controls.Add(heading);
+        heading.SetBounds(27,59,615,96);heading.Font=new Font("Segoe UI",20,FontStyle.Bold);detail.Controls.Add(heading);
         description.SetBounds(29,163,610,86);description.Font=new Font("Segoe UI",12);description.ForeColor=muted;detail.Controls.Add(description);
         bindings.SetBounds(28,257,614,200);bindings.FlowDirection=FlowDirection.TopDown;bindings.WrapContents=false;bindings.AutoScroll=true;detail.Controls.Add(bindings);
         conditions.SetBounds(29,472,612,100);conditions.Font=new Font("Segoe UI",10);conditions.ForeColor=muted;detail.Controls.Add(conditions);
@@ -255,12 +271,12 @@ public class MainWindow:Form {
         apply=MakeButton(Words.T("Применить","Apply changes"),936,789,153,true);apply.Click+=(s,e)=>Run(()=>{engine.Apply(folder.Text,SelectionMask());status.Text=Words.T("Готово. Выбранные изменения установлены; файлы проверены.","Done. Selected changes were installed and verified.");});
         BuildRows();Shown+=(s,e)=>Inspect();
     }
-    Button MakeButton(string text,int x,int y,int width,bool primary){var b=new Button{Text=text,Location=new Point(x,y),Size=new Size(width,38),FlatStyle=FlatStyle.Flat,BackColor=primary?accent:Color.White,ForeColor=primary?Color.White:ink};b.FlatAppearance.BorderColor=primary?accent:line;Controls.Add(b);return b;}
-    void BuildRows(){updating=true;list.Controls.Clear();rows.Clear();int y=0;foreach(var copy in copies){var f=engine.P.features.FirstOrDefault(x=>x.id==copy.id);if(f==null)continue;var row=new FeatureRow(f,copy);row.SetBounds(0,y,346,43);row.Pick+=(s,e)=>SelectFeature(row.Feature.id);row.Box.CheckedChanged+=(s,e)=>{if(updating)return;updating=true;try{if(f.bit==1&&row.Box.Checked)SetBit(2,true);if(f.bit==2&&!row.Box.Checked)SetBit(1,false);if(f.bit==1024&&row.Box.Checked)SetBit(128,true);if(f.bit==128&&!row.Box.Checked)SetBit(1024,false);}finally{updating=false;}UpdateCount();};list.Controls.Add(row);rows.Add(row);y+=49;}updating=false;UpdateCount();SelectFeature(rows.Any(x=>x.Feature.id==selectedId)?selectedId:rows[0].Feature.id);}
+    Button MakeButton(string text,int x,int y,int width,bool primary){var b=new Button{Text=text,Location=new Point(x,y),Size=new Size(width,38),FlatStyle=FlatStyle.Flat,BackColor=primary?accent:Theme.Card,ForeColor=primary?Theme.Background:ink};b.FlatAppearance.BorderColor=primary?accent:line;b.FlatAppearance.MouseOverBackColor=primary?Color.FromArgb(132,206,239):Theme.Selected;b.FlatAppearance.MouseDownBackColor=Theme.Selected;Controls.Add(b);return b;}
+    void BuildRows(){updating=true;list.Controls.Clear();rows.Clear();int y=0;foreach(var copy in copies){var f=engine.P.features.FirstOrDefault(x=>x.id==copy.id);if(f==null)continue;var row=new FeatureRow(f,copy);row.SetBounds(0,y,346,40);row.Pick+=(s,e)=>SelectFeature(row.Feature.id);row.Box.CheckedChanged+=(s,e)=>{if(updating)return;updating=true;try{if(f.bit==1&&row.Box.Checked)SetBit(2,true);if(f.bit==2&&!row.Box.Checked)SetBit(1,false);if(f.bit==1024&&row.Box.Checked)SetBit(128,true);if(f.bit==128&&!row.Box.Checked)SetBit(1024,false);}finally{updating=false;}UpdateCount();};list.Controls.Add(row);rows.Add(row);y+=43;}updating=false;UpdateCount();SelectFeature(rows.Any(x=>x.Feature.id==selectedId)?selectedId:rows[0].Feature.id);}
     void SetBit(int bit,bool value){var row=rows.FirstOrDefault(x=>x.Feature.bit==bit);if(row!=null)row.Box.Checked=value;}
     void UpdateCount(){count.Text=Words.T("Выбрано ","Selected ")+rows.Count(x=>x.Box.Checked)+Words.T(" из "," of ")+rows.Count+Words.T(" возможностей"," features");}
     int SelectionMask(){return rows.Where(x=>x.Box.Checked).Aggregate(0,(n,x)=>n|x.Feature.bit);}
-    public void SelectFeature(string id){var row=rows.FirstOrDefault(x=>x.Feature.id==id);if(row==null)return;selectedId=id;foreach(var r in rows){r.Selected=r==row;r.BackColor=r.Selected?Color.FromArgb(235,245,250):Color.White;r.Invalidate();}var c=row.Copy;section.Text=Words.T(c.group,c.groupEn).ToUpperInvariant()+Words.T("  /  УПРАВЛЕНИЕ","  /  CONTROLS");heading.Text=Words.T(c.title,c.titleEn);description.Text=Words.T(c.description,c.descriptionEn);conditions.Text=Words.T(c.note,c.noteEn);bindings.Controls.Clear();foreach(var key in Words.English?c.controlsEn:c.controls){bindings.Controls.Add(new Label{Text=key,AutoSize=false,Size=new Size(590,28),Margin=new Padding(0,0,0,4),Padding=new Padding(9,4,4,0),BackColor=Color.FromArgb(234,243,248),ForeColor=accent,Font=new Font("Segoe UI",10,FontStyle.Bold)});}if(row.Top<list.VerticalScroll.Value||row.Bottom>list.VerticalScroll.Value+list.ClientSize.Height)list.ScrollControlIntoView(row);}
+    public void SelectFeature(string id){var row=rows.FirstOrDefault(x=>x.Feature.id==id);if(row==null)return;selectedId=id;foreach(var r in rows){r.Selected=r==row;r.BackColor=r.Selected?Theme.Selected:Theme.Card;r.Invalidate();}var c=row.Copy;section.Text=Words.T(c.group,c.groupEn).ToUpperInvariant()+Words.T("  /  УПРАВЛЕНИЕ","  /  CONTROLS");heading.Text=Words.T(c.title,c.titleEn);description.Text=Words.T(c.description,c.descriptionEn);conditions.Text=Words.T(c.note,c.noteEn);bindings.Controls.Clear();foreach(var key in Words.English?c.controlsEn:c.controls){bindings.Controls.Add(new Label{Text=key,AutoSize=false,Size=new Size(590,28),Margin=new Padding(0,0,0,4),Padding=new Padding(9,4,4,0),BackColor=Theme.Selected,ForeColor=accent,Font=new Font("Segoe UI",10,FontStyle.Bold)});}if(row.Top<list.VerticalScroll.Value||row.Bottom>list.VerticalScroll.Value+list.ClientSize.Height)list.ScrollControlIntoView(row);}
     public void CaptureGallery(string directory){Directory.CreateDirectory(directory);foreach(var row in rows){SelectFeature(row.Feature.id);Application.DoEvents();using(var b=new Bitmap(Width,Height)){DrawToBitmap(b,new Rectangle(0,0,Width,Height));b.Save(Path.Combine(directory,row.Feature.id+".png"));}}}
     public void VerifyUI(){if(rows.Count!=13||SelectionMask()!=8191)throw new Exception("UI defaults failed");SetBit(2,false);if((SelectionMask()&3)!=0)throw new Exception("Reload dependency failed");SetBit(1,true);if((SelectionMask()&3)!=3)throw new Exception("Cloak dependency failed");SetBit(128,false);if((SelectionMask()&1024)!=0)throw new Exception("Random dependency failed");foreach(var row in rows)row.Box.Checked=true;foreach(var row in rows)SelectFeature(row.Feature.id);if(SelectionMask()!=8191)throw new Exception("Checkbox selection failed");SelectFeature(rows[0].Feature.id);}
     void Inspect(){try{engine.Check(folder.Text);if(rows.Count!=engine.P.features.Length)BuildRows();status.Text=Words.T("Найден VR-мод ","Detected VR mod ")+engine.P.version+Words.T(". Перед применением закройте игру. Резервные копии сохраняются в папке игры.",". Close the game before applying. Backups are stored in the game folder.");apply.Enabled=true;}catch(Exception ex){status.Text=Words.Error(ex.Message.Split('\n')[0]);apply.Enabled=false;}}

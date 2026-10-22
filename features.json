@@ -68,8 +68,8 @@
     "id": "weightedSteering",
     "group": "Титан",
     "groupEn": "Titan",
-    "title": "Поворот за оружием и головой",
-    "titleEn": "Weapon and head steering",
+    "title": "Быстрый поворот кабины титана головой и оружием",
+    "titleEn": "Fast Titan cockpit turning with head and weapon",
     "description": "Оружие задаёт 70% направления кабины, голова — 30%. Поворот быстрее, с небольшим доворотом по инерции.",
     "descriptionEn": "The weapon contributes 70% of the cockpit's target heading and your head contributes 30%. Turning is faster, with a brief inertial follow-through.",
     "controls": [
@@ -89,8 +89,8 @@
     "id": "noStickYaw",
     "group": "Титан",
     "groupEn": "Titan",
-    "title": "Без поворота стиком влево-вправо",
-    "titleEn": "Disable horizontal stick turning",
+    "title": "Убрать поворот кабины титанов стиками влево вправо",
+    "titleEn": "Disable left/right Titan cockpit stick turning",
     "description": "Отключите искусственный поворот правым стиком у пилота и титана. Поворачивайтесь движениями в VR.",
     "descriptionEn": "Disable artificial left/right turning with the right stick, both on foot and in a Titan. Use physical VR movement instead.",
     "controls": [
