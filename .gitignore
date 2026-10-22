@@ -9,3 +9,5 @@ legacy-game/
 Backups/
 .quest-custom-patch/
 *.tmp
+
+docs/frames/

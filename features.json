@@ -1,0 +1,245 @@
+[
+  {
+    "id": "cycle",
+    "group": "Титан",
+    "groupEn": "Titan",
+    "title": "Смена комплекта титана в бою",
+    "titleEn": "Switch Titan loadouts in combat",
+    "description": "Меняйте вооружение и способности титана по кругу, не открывая меню.",
+    "descriptionEn": "Cycle through your Titan's weapons and abilities without opening a menu.",
+    "controls": [
+      "Правый Grip + X → следующий комплект"
+    ],
+    "controlsEn": [
+      "Right Grip + X → next loadout"
+    ],
+    "note": "Только внутри титана. X находится на левом контроллере. Одно нажатие комбинации — одно переключение. Для выхода из титана используйте обычный X без Grip.",
+    "noteEn": "Only while piloting a Titan. X is on the left controller. One chord press switches once. Plain X without Grip keeps its normal disembark action."
+  },
+  {
+    "id": "allTitans",
+    "group": "Титан",
+    "groupEn": "Titan",
+    "title": "Все 8 комплектов с начала кампании",
+    "titleEn": "All 8 campaign Titan loadouts",
+    "description": "Добавьте в круг переключения даже те комплекты, которые ещё закрыты по сюжету.",
+    "descriptionEn": "Include campaign loadouts that have not yet been unlocked by the story.",
+    "controls": [
+      "Правый Grip + X → переключение по кругу",
+      "Expedition · Tone · Scorch · Brute",
+      "Ion · Ronin · Northstar · Legion"
+    ],
+    "controlsEn": [
+      "Right Grip + X → cycle loadouts",
+      "Expedition · Tone · Scorch · Brute",
+      "Ion · Ronin · Northstar · Legion"
+    ],
+    "note": "Доступны, когда вы управляете титаном. Сам титан в пешей части первой миссии не выдаётся. Замки в меню и сюжетный прогресс сохраняются. Недоступные на уровне ресурсы могут ограничивать выбор.",
+    "noteEn": "Available once you are piloting a Titan; this does not spawn a Titan during the first mission's on-foot section. Menu locks and story progress remain unchanged. Level resource availability can limit selection."
+  },
+  {
+    "id": "chords",
+    "group": "Титан",
+    "groupEn": "Titan",
+    "title": "Способности титана на кнопках",
+    "titleEn": "Titan abilities on button chords",
+    "description": "Зажмите левый Grip и выберите способность кнопкой. Не нужно двигать руку по направлениям стрелок.",
+    "descriptionEn": "Hold Left Grip and press a button to use an ability. No directional hand gestures are required.",
+    "controls": [
+      "Левый Grip + левый Trigger → способность 1",
+      "Левый Grip + A → способность 2",
+      "Левый Grip + B → способность 3",
+      "Левый Grip + R3 → ядро титана",
+      "Левый Grip + правый Trigger → удар",
+      "R3 без Grip → удар"
+    ],
+    "controlsEn": [
+      "Left Grip + Left Trigger → ability 1",
+      "Left Grip + A → ability 2",
+      "Left Grip + B → ability 3",
+      "Left Grip + R3 → Titan core",
+      "Left Grip + Right Trigger → melee",
+      "R3 without Grip → melee"
+    ],
+    "note": "A и B находятся на правом контроллере. R3 — нажатие правого стика. Способность 1 поддерживает удержание. Для VR 1.0.13 / 1.0.14 сохраняется прежняя схема; новые сочетания относятся к 1.0.17.",
+    "noteEn": "A and B are on the right controller. R3 means clicking the right stick. Ability 1 supports holding. VR 1.0.13 / 1.0.14 retain their earlier mapping; the updated chords apply to 1.0.17."
+  },
+  {
+    "id": "weightedSteering",
+    "group": "Титан",
+    "groupEn": "Titan",
+    "title": "Поворот за оружием и головой",
+    "titleEn": "Weapon and head steering",
+    "description": "Оружие задаёт 70% направления кабины, голова — 30%. Поворот быстрее, с небольшим доворотом по инерции.",
+    "descriptionEn": "The weapon contributes 70% of the cockpit's target heading and your head contributes 30%. Turning is faster, with a brief inertial follow-through.",
+    "controls": [
+      "Оружие — 70%   /   Голова — 30%",
+      "Автодоворот — до 360°/с",
+      "Краткая инерция — до 20°"
+    ],
+    "controlsEn": [
+      "Weapon — 70%   /   Head — 30%",
+      "Automatic turn rate — up to 360°/s",
+      "Transient inertial lead — up to 20°"
+    ],
+    "note": "Также ускоряет переходы защиты мечом и восстановление до 0,1 с. При потере корректной позы оружия управление временно переходит к голове. Если поворот стиком включён, его скорость увеличивается вдвое.",
+    "noteEn": "Also reduces sword-defense transitions and recovery settings to 0.1 s. If the weapon pose is invalid, steering falls back to the headset. Stick turn speed is doubled when stick turning is enabled."
+  },
+  {
+    "id": "noStickYaw",
+    "group": "Титан",
+    "groupEn": "Titan",
+    "title": "Без поворота стиком влево-вправо",
+    "titleEn": "Disable horizontal stick turning",
+    "description": "Отключите искусственный поворот правым стиком у пилота и титана. Поворачивайтесь движениями в VR.",
+    "descriptionEn": "Disable artificial left/right turning with the right stick, both on foot and in a Titan. Use physical VR movement instead.",
+    "controls": [
+      "Правый стик влево / вправо → без поворота"
+    ],
+    "controlsEn": [
+      "Right stick left / right → no virtual turn"
+    ],
+    "note": "Движения стика вверх-вниз и его нажатие сохраняются. Для управления кабиной титана движениями включите смешанный поворот за оружием и головой.",
+    "noteEn": "Vertical stick input and stick clicks are preserved. Enable weapon/head steering above to steer the Titan cockpit using tracked motion."
+  },
+  {
+    "id": "holster",
+    "group": "Оружие",
+    "groupEn": "Weapons",
+    "title": "Обмен оружия между кобурами",
+    "titleEn": "Swap weapons between holsters",
+    "description": "Меняйте местами оружие за спиной и у левого бедра. Оружие остаётся в кобурах, а не достаётся в руки.",
+    "descriptionEn": "Swap the weapons stored behind your shoulder and at your left hip. Both stay holstered rather than being drawn into your hands.",
+    "controls": [
+      "B → поменять оружие местами"
+    ],
+    "controlsEn": [
+      "B → swap holstered weapons"
+    ],
+    "note": "Оба оружия убраны, руки пустые, остальные кнопки отпущены. B находится на правом контроллере. С оружием в руках B сохраняет обычную перезарядку.",
+    "noteEn": "Both weapons must be holstered, hands empty, and other buttons released. B is on the right controller. With a weapon in hand, B retains normal reload behavior."
+  },
+  {
+    "id": "dot",
+    "group": "Оружие",
+    "groupEn": "Weapons",
+    "title": "Точка прицела от бедра",
+    "titleEn": "Hip-fire aiming dot",
+    "description": "Видьте направление оружия, не поднося его к глазу и не входя в режим прицеливания.",
+    "descriptionEn": "See where your weapon is pointing without bringing it up to your eye or entering the aiming view.",
+    "controls": [
+      "Белая заполненная точка",
+      "Отображается с оружием в руках у пилота"
+    ],
+    "controlsEn": [
+      "Small, solid white dot",
+      "Shown while the pilot holds a weapon"
+    ],
+    "note": "Это указатель направления оружия. Он не отображает разброс или предсказанную траекторию. Для гранат и титана точка не показывается.",
+    "noteEn": "This indicates weapon direction, not bullet spread or a predicted trajectory. It is not shown for grenades or Titans."
+  },
+  {
+    "id": "randomWeapon",
+    "group": "Оружие",
+    "groupEn": "Weapons",
+    "title": "Случайное оружие за спиной",
+    "titleEn": "Randomize your shoulder weapon",
+    "description": "Заменяйте оружие за спиной случайным. Оружие у левого бедра остаётся прежним.",
+    "descriptionEn": "Replace the weapon in your shoulder holster with a random weapon. Your left-hip weapon stays unchanged.",
+    "controls": [
+      "Правый Trigger + B → случайное оружие",
+      "Для повторной замены снова нажмите B"
+    ],
+    "controlsEn": [
+      "Right Trigger + B → random weapon",
+      "Press B again for another replacement"
+    ],
+    "note": "Оба оружия должны быть убраны, руки — пустыми. Выбор из 31 типа зависит от ресурсов уровня; имеющиеся типы исключаются. Требует включённого обмена оружия между кобурами.",
+    "noteEn": "Both weapons must be holstered and your hands empty. The 31-weapon pool is filtered by level resource availability and excludes your current weapons. Requires the holster-swap option."
+  },
+  {
+    "id": "reload",
+    "group": "Взаимодействия",
+    "groupEn": "Interactions",
+    "title": "Магазин и перезарядка на Trigger",
+    "titleEn": "Magazine and reload on Trigger",
+    "description": "Берите магазин и управляйте ручной перезарядкой левым курком. Grip остаётся для хвата оружия.",
+    "descriptionEn": "Use the left trigger to grab magazines and operate manual reload mechanisms. Grip remains available for holding the weapon.",
+    "controls": [
+      "Левый Trigger → магазин и перезарядка"
+    ],
+    "controlsEn": [
+      "Left Trigger → magazine and reload"
+    ],
+    "note": "Автоматически включает перенос способности пилота на L3, чтобы освободить левый Trigger.",
+    "noteEn": "Automatically enables moving the pilot ability to L3 to free the left trigger."
+  },
+  {
+    "id": "cloak",
+    "group": "Взаимодействия",
+    "groupEn": "Interactions",
+    "title": "Способность пилота на L3",
+    "titleEn": "Pilot ability on L3",
+    "description": "Активируйте cloak или текущую способность пилота нажатием левого стика.",
+    "descriptionEn": "Activate cloak or the pilot's current ability by clicking the left stick.",
+    "controls": [
+      "L3 → способность пилота"
+    ],
+    "controlsEn": [
+      "L3 → pilot ability"
+    ],
+    "note": "Работает вне титана. L3 — нажатие левого стика. Освобождает левый Trigger для перезарядки.",
+    "noteEn": "Applies on foot. L3 means clicking the left stick. Frees the left trigger for reload interactions."
+  },
+  {
+    "id": "grip",
+    "group": "Взаимодействия",
+    "groupEn": "Interactions",
+    "title": "Область поддержки оружия ×2",
+    "titleEn": "Double the support-hand area",
+    "description": "Увеличьте в два раза область, в которой срабатывает хват оружия второй рукой.",
+    "descriptionEn": "Double the interaction area used when supporting your weapon with the second hand.",
+    "controls": [
+      "Область хвата второй рукой ×2"
+    ],
+    "controlsEn": [
+      "Support-hand grab area ×2"
+    ],
+    "note": "Область извлечения оружия правым Grip не меняется.",
+    "noteEn": "Does not change the right-Grip weapon-draw area."
+  },
+  {
+    "id": "area",
+    "group": "Взаимодействия",
+    "groupEn": "Interactions",
+    "title": "Области перезарядки ×2",
+    "titleEn": "Double the reload interaction areas",
+    "description": "Увеличьте области магазина и механизмов перезарядки в два раза, чтобы движения требовали меньшей точности.",
+    "descriptionEn": "Double magazine and reload-mechanism interaction areas so controller movements require less precision.",
+    "controls": [
+      "Магазин и механизмы перезарядки ×2"
+    ],
+    "controlsEn": [
+      "Magazine and reload-mechanism areas ×2"
+    ],
+    "note": "Изменяется область взаимодействия, а не скорость анимации перезарядки.",
+    "noteEn": "Changes interaction areas, not the speed of reload animations."
+  },
+  {
+    "id": "grenade",
+    "group": "Взаимодействия",
+    "groupEn": "Interactions",
+    "title": "Граната с груди на правом Trigger",
+    "titleEn": "Chest grenade on Right Trigger",
+    "description": "Поднесите руку к груди и нажмите правый курок, чтобы взять обычную гранату.",
+    "descriptionEn": "Bring your hand to your chest and press the right trigger to grab a regular grenade.",
+    "controls": [
+      "Рука у груди + правый Trigger → граната"
+    ],
+    "controlsEn": [
+      "Hand at chest + Right Trigger → grenade"
+    ],
+    "note": "Опция относится к обычным гранатам. Изменение взятия C4 в неё не входит.",
+    "noteEn": "Applies to regular grenades. C4 pickup changes are not included."
+  }
+]

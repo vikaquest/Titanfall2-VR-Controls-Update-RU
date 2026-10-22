@@ -10,6 +10,11 @@ using System.Drawing;
 using System.Diagnostics;
 using System.Reflection;
 
+[assembly: AssemblyTitle("Titanfall 2 VR — Апдейт управления")]
+[assembly: AssemblyVersion("1.3.0.0")]
+[assembly: AssemblyFileVersion("1.3.0.0")]
+[assembly: AssemblyInformationalVersion("1.3.0")]
+
 public class Op { public int offset; public int remove; public string data; public int any; }
 public class Variant { public Op[] ops; public string hash; }
 public class FileRecipe { public string path,hash,sourcePath,adoptHash; public bool optional; public int length,mask; public Op[] ops; public Dictionary<string,Variant> variants; }
@@ -85,6 +90,11 @@ public class Engine {
             string path=FilePath(root,f.path);
             if(!File.Exists(path) && !f.optional) throw new Exception("Не найден файл: "+f.path+"\nСначала установите VR-мод через CircuitLordVRModInstaller.");
             string h=File.Exists(path)?Hash(File.ReadAllBytes(path)):null;
+            if(!f.optional && s!=null && !s.current.ContainsKey(f.path)) {
+                if(h!=f.hash && !(P.legacy??new Legacy[0]).Any(x=>x.path==f.path&&x.hash==h))throw new Exception("Неизвестный файл новой опции: "+f.path);
+                s.current[f.path]=h;
+            }
+            if(s!=null&&s.initial!=null&&!s.initial.ContainsKey(f.path))s.initial[f.path]=f.optional?null:h;
             if(f.optional && s!=null && !s.current.ContainsKey(f.path)) {
                 if(h!=null&&h!=f.adoptHash)throw new Exception("Неизвестный дополнительный скрипт: "+f.path);
                 s.current[f.path]=h;if(s.initial!=null)s.initial[f.path]=null;
@@ -93,7 +103,7 @@ public class Engine {
             stock &= f.optional?h==null:h==f.hash;var prior=(P.legacy??new Legacy[0]).FirstOrDefault(x=>x.path==f.path);legacy &= f.optional?h==null:prior!=null&&h==prior.hash;
         }
         if(s!=null) {
-            foreach(var f in P.files) {string bp=FilePath(root,BackupRel("baseline/"+f.path));if(f.optional&&!File.Exists(bp)){if(Hash(File.ReadAllBytes(FilePath(root,f.sourcePath)))!=f.hash)throw new Exception("Неизвестная исходная версия скрипта комплектов титана.");}else if(Hash(File.ReadAllBytes(bp))!=f.hash) throw new Exception("Повреждена резервная копия.");}
+            foreach(var f in P.files) {string bp=FilePath(root,BackupRel("baseline/"+f.path));if(!File.Exists(bp)){if(f.optional ? Hash(File.ReadAllBytes(FilePath(root,f.sourcePath)))!=f.hash : (Hash(File.ReadAllBytes(FilePath(root,f.path)))!=f.hash && !(P.legacy??new Legacy[0]).Any(x=>x.path==f.path&&x.hash==Hash(File.ReadAllBytes(FilePath(root,f.path))))))throw new Exception("Неизвестная исходная версия скрипта комплектов титана.");}else if(Hash(File.ReadAllBytes(bp))!=f.hash) throw new Exception("Повреждена резервная копия.");}
             return s;
         }
         if(!stock&&!legacy) throw new Exception("Эта сборка VR-мода не поддерживается. Требуются проверенные исходные файлы Titanfall 2 VR 1.0.13, 1.0.14 или 1.0.17.\nПатч не изменяет неизвестные DLL и скрипты.");
@@ -129,7 +139,14 @@ public class Engine {
                     Directory.CreateDirectory(Path.GetDirectoryName(bp));
                     if(File.Exists(bp)&&Hash(File.ReadAllBytes(bp))!=f.hash)throw new Exception("Резервная копия повреждена.");
                     if(!File.Exists(bp))File.WriteAllBytes(bp,b);
-                } else {if(f.optional&&!File.Exists(bp)){b=File.ReadAllBytes(FilePath(root,f.sourcePath));if(Hash(b)!=f.hash)throw new Exception("Неизвестная исходная версия скрипта.");Directory.CreateDirectory(Path.GetDirectoryName(bp));File.WriteAllBytes(bp,b);}else b=File.ReadAllBytes(bp);}
+                } else {if(f.optional&&!File.Exists(bp)){b=File.ReadAllBytes(FilePath(root,f.sourcePath));if(Hash(b)!=f.hash)throw new Exception("Неизвестная исходная версия скрипта.");Directory.CreateDirectory(Path.GetDirectoryName(bp));File.WriteAllBytes(bp,b);}else if(!File.Exists(bp)){
+                    b=File.ReadAllBytes(FilePath(root,f.path));string h=Hash(b);
+                    string ip=FilePath(root,BackupRel("initial/"+f.path));Directory.CreateDirectory(Path.GetDirectoryName(ip));
+                    if(!File.Exists(ip))File.WriteAllBytes(ip,b);
+                    if(h!=f.hash){var prior=(P.legacy??new Legacy[0]).FirstOrDefault(x=>x.path==f.path&&x.hash==h);if(prior==null)throw new Exception("Неизвестный файл новой опции.");b=Edit(b,prior.ops);}
+                    if(Hash(b)!=f.hash)throw new Exception("Не удалось восстановить исходный файл новой опции.");
+                    Directory.CreateDirectory(Path.GetDirectoryName(bp));File.WriteAllBytes(bp,b);
+                }else b=File.ReadAllBytes(bp);}
                 bases[f.path]=b;
             }
             if(s.initial==null)s.initial=new Dictionary<string,string>(s.current);
@@ -185,33 +202,79 @@ public class Engine {
     }
 }
 
-public class MainWindow:Form {
-    Engine engine=new Engine();TextBox folder=new TextBox();CheckedListBox options=new CheckedListBox();Label status=new Label();Button apply=new Button(),restore=new Button(); bool updating;
-    public MainWindow() {
-        Text="Titanfall 2 VR — Апдейт управления v1.2.0";ClientSize=new Size(740,580);MinimumSize=MaximumSize=Size;FormBorderStyle=FormBorderStyle.FixedSingle;MaximizeBox=false;StartPosition=FormStartPosition.CenterScreen;Font=new Font("Segoe UI",10);BackColor=Color.FromArgb(245,247,250);
-        Controls.Add(new Label{Text="Titanfall 2 VR — удобное управление",Font=new Font("Segoe UI",17,FontStyle.Bold),Location=new Point(22,18),Size=new Size(690,40)});
-        Controls.Add(new Label{Text="Патчер 1.2.0 • VR-мод 1.0.13 / 1.0.14 / 1.0.17 • Quest 3 / Touch",Location=new Point(24,64),Size=new Size(690,25)});
-        folder.SetBounds(24,105,577,28);folder.Text=Directory.Exists(@"D:\SteamLibrary\steamapps\common\Titanfall2")?@"D:\SteamLibrary\steamapps\common\Titanfall2":"";Controls.Add(folder);
-        var browse=new Button{Text="Папка игры…",Location=new Point(610,103),Size=new Size(106,31)};browse.Click+=(s,e)=>{using(var d=new FolderBrowserDialog{Description="Выберите папку Titanfall2",SelectedPath=folder.Text})if(d.ShowDialog()==DialogResult.OK){folder.Text=d.SelectedPath;Inspect();}};Controls.Add(browse);
-        options.SetBounds(24,150,692,245);options.CheckOnClick=true;options.BorderStyle=BorderStyle.FixedSingle;options.BackColor=Color.White;
-        foreach(var f in engine.P.features)options.Items.Add(f.label,true);
-        options.ItemCheck+=(s,e)=>{if(updating)return;updating=true;try {if(e.Index==0&&e.NewValue==CheckState.Checked)options.SetItemChecked(1,true);if(e.Index==1&&e.NewValue==CheckState.Unchecked)options.SetItemChecked(0,false);if(options.Items.Count>9){if(e.Index==9&&e.NewValue==CheckState.Checked)options.SetItemChecked(5,false);if(e.Index==5&&e.NewValue==CheckState.Checked)options.SetItemChecked(9,false);if(e.Index==10&&e.NewValue==CheckState.Checked)options.SetItemChecked(7,true);if(e.Index==7&&e.NewValue==CheckState.Unchecked)options.SetItemChecked(10,false);}}finally{updating=false;}};
-        Controls.Add(options);
-        Controls.Add(new Label{Text="Титан: Grip + Trigger — способность 1; + A — 2; + B — 3; + L3 — ядро; + правый Trigger — удар.\nОбмен на B: оба оружия убраны, руки пустые, другие кнопки отпущены.\nРезервные копии сохраняются в папке игры. Перед применением закройте игру.",Location=new Point(24,404),Size=new Size(692,66)});
-        status.SetBounds(24,475,692,45);status.ForeColor=Color.FromArgb(60,80,100);Controls.Add(status);
-        apply.Text="Применить выбранное";apply.SetBounds(24,528,220,34);apply.Click+=(s,e)=>Run(()=>{int mask=0;for(int i=0;i<options.Items.Count;i++)if(options.GetItemChecked(i))mask|=engine.P.features[i].bit;engine.Apply(folder.Text,mask);status.Text="Готово. Выбранные изменения установлены; файлы проверены.";});Controls.Add(apply);
-        restore.Text="Восстановить";restore.SetBounds(256,528,160,34);restore.Click+=(s,e)=>Run(()=>{engine.Restore(folder.Text);Inspect();status.Text="Восстановлены файлы до первого применения этого патча.";});Controls.Add(restore);
-        var check=new Button{Text="Проверить файлы",Location=new Point(430,528),Size=new Size(170,34)};check.Click+=(s,e)=>Inspect();Controls.Add(check);
-        Shown+=(s,e)=>Inspect();
+public class FeatureCopy { public string id,group,groupEn,title,titleEn,description,descriptionEn,note,noteEn; public string[] controls,controlsEn; }
+public static class Words {
+#if EN
+    public static readonly bool English=true;
+#else
+    public static readonly bool English=false;
+#endif
+    public static string T(string ru,string en){return English?en:ru;}
+    public static string Error(string message){
+        if(!English)return message;
+        foreach(var pair in Errors.OrderByDescending(x=>x.Key.Length))message=message.Replace(pair.Key,pair.Value);
+        return message;
     }
-    void Run(Action action) {try{apply.Enabled=restore.Enabled=false;UseWaitCursor=true;action();}catch(Exception ex){status.Text="Изменения не применены.";MessageBox.Show(this,ex.Message,"Quest Custom Patch",MessageBoxButtons.OK,MessageBoxIcon.Warning);}finally{UseWaitCursor=false;apply.Enabled=restore.Enabled=true;}}
-    void Inspect() {try{var s=engine.Check(folder.Text);bool fresh=s.mask==0&&!File.Exists(Path.Combine(engine.Backup(folder.Text),"state.json"));updating=true;options.Items.Clear();foreach(var f in engine.P.features)options.Items.Add(f.label,(fresh&&f.bit!=1024&&f.bit!=512)||(s.mask&f.bit)!=0);updating=false;status.Text="Найдена VR "+engine.P.version+". "+(s.imported?"Импорт предыдущих изменений доступен.":"Выберите нужные изменения.");apply.Enabled=true;}catch(Exception ex){updating=false;status.Text=ex.Message.Split('\n')[0];apply.Enabled=false;}}
+    public static Dictionary<string,string> Errors=new Dictionary<string,string>();
+}
+public class FeatureRow:Panel {
+    public CheckBox Box=new CheckBox(); public Label Caption=new Label(); public Feature Feature; public FeatureCopy Copy;
+    public bool Selected; public event EventHandler Pick;
+    public FeatureRow(Feature f,FeatureCopy copy){
+        Feature=f;Copy=copy;Height=43;Margin=new Padding(0,0,0,6);BackColor=Color.White;
+        Box.SetBounds(13,12,20,20);Box.Checked=true;Box.AccessibleName=Words.T(copy.title,copy.titleEn);Controls.Add(Box);
+        Caption.Text=Words.T(copy.title,copy.titleEn);Caption.SetBounds(42,2,302,39);Caption.TextAlign=ContentAlignment.MiddleLeft;Caption.Font=new Font("Segoe UI",9.5f);Caption.Cursor=Cursors.Hand;Controls.Add(Caption);
+        Caption.Click+=(s,e)=>{if(Pick!=null)Pick(this,EventArgs.Empty);};Click+=(s,e)=>{if(Pick!=null)Pick(this,EventArgs.Empty);};Box.Enter+=(s,e)=>{if(Pick!=null)Pick(this,EventArgs.Empty);};
+    }
+    protected override void OnPaint(PaintEventArgs e){base.OnPaint(e);using(var pen=new Pen(Selected?Color.FromArgb(30,112,156):Color.FromArgb(214,224,232),Selected?2:1))e.Graphics.DrawRectangle(pen,0,0,Width-1,Height-1);}
+}
+public class MainWindow:Form {
+    Engine engine=new Engine(); TextBox folder=new TextBox(); Panel list=new Panel(),detail=new Panel(); Label status=new Label(),count=new Label(),heading=new Label(),description=new Label(),conditions=new Label(),section=new Label(); FlowLayoutPanel bindings=new FlowLayoutPanel();
+    Button apply=new Button(),restore=new Button(); List<FeatureRow> rows=new List<FeatureRow>(); List<FeatureCopy> copies; bool updating; string selectedId;
+    Color ink=Color.FromArgb(23,43,61),muted=Color.FromArgb(78,99,117),accent=Color.FromArgb(25,103,145),line=Color.FromArgb(213,224,232);
+    public MainWindow(){
+        using(var s=Assembly.GetExecutingAssembly().GetManifestResourceStream("features.json"))using(var r=new StreamReader(s,Encoding.UTF8))copies=Engine.Json.Deserialize<List<FeatureCopy>>(r.ReadToEnd());
+        using(var s=Assembly.GetExecutingAssembly().GetManifestResourceStream("messages.json"))using(var r=new StreamReader(s,Encoding.UTF8))Words.Errors=Engine.Json.Deserialize<Dictionary<string,string>>(r.ReadToEnd());
+        Text=Words.T("Titanfall 2 VR — Апдейт управления v1.3.0","Titanfall 2 VR — Controls Update v1.3.0");ClientSize=new Size(1120,860);MinimumSize=MaximumSize=Size;FormBorderStyle=FormBorderStyle.FixedSingle;MaximizeBox=false;StartPosition=FormStartPosition.CenterScreen;Font=new Font("Segoe UI",10);BackColor=Color.FromArgb(244,247,249);ForeColor=ink;AutoScaleMode=AutoScaleMode.None;
+        var title=new Label{Text="Titanfall 2 VR",Font=new Font("Segoe UI",24,FontStyle.Bold),Location=new Point(28,17),Size=new Size(600,45),ForeColor=ink};Controls.Add(title);
+        Controls.Add(new Label{Text=Words.T("Апдейт управления 1.3.0  /  Quest & Touch","Controls Update 1.3.0  /  Quest & Touch"),Location=new Point(31,66),Size=new Size(1000,24),ForeColor=muted});
+        folder.SetBounds(31,103,920,28);folder.Text=Directory.Exists(@"D:\SteamLibrary\steamapps\common\Titanfall2")?@"D:\SteamLibrary\steamapps\common\Titanfall2":"";Controls.Add(folder);
+        var browse=MakeButton(Words.T("Папка игры…","Game folder…"),962,100,127,false);browse.Click+=(s,e)=>{using(var d=new FolderBrowserDialog{Description=Words.T("Выберите папку Titanfall2","Select your Titanfall2 folder"),SelectedPath=folder.Text})if(d.ShowDialog()==DialogResult.OK){folder.Text=d.SelectedPath;Inspect();}};
+        Controls.Add(new Label{Text=Words.T("ВОЗМОЖНОСТИ","FEATURES"),Location=new Point(31,150),Size=new Size(353,22),ForeColor=muted,Font=new Font("Segoe UI",9,FontStyle.Bold)});
+        list.SetBounds(31,180,366,565);list.AutoScroll=true;Controls.Add(list);
+        detail.SetBounds(415,150,674,595);detail.BackColor=Color.White;detail.Paint+=(s,e)=>{using(var pen=new Pen(line))e.Graphics.DrawRectangle(pen,0,0,detail.Width-1,detail.Height-1);};Controls.Add(detail);
+        section.SetBounds(27,23,614,24);section.ForeColor=accent;section.Font=new Font("Segoe UI",10,FontStyle.Bold);detail.Controls.Add(section);
+        heading.SetBounds(27,59,615,96);heading.Font=new Font("Segoe UI",23,FontStyle.Bold);detail.Controls.Add(heading);
+        description.SetBounds(29,163,610,86);description.Font=new Font("Segoe UI",12);description.ForeColor=muted;detail.Controls.Add(description);
+        bindings.SetBounds(28,257,614,200);bindings.FlowDirection=FlowDirection.TopDown;bindings.WrapContents=false;bindings.AutoScroll=true;detail.Controls.Add(bindings);
+        conditions.SetBounds(29,472,612,100);conditions.Font=new Font("Segoe UI",10);conditions.ForeColor=muted;detail.Controls.Add(conditions);
+        count.SetBounds(31,761,370,23);count.Font=new Font("Segoe UI",10,FontStyle.Bold);Controls.Add(count);
+        status.SetBounds(31,789,636,50);status.ForeColor=muted;status.Font=new Font("Segoe UI",9);Controls.Add(status);
+        var check=MakeButton(Words.T("Проверить","Check files"),678,789,115,false);check.Click+=(s,e)=>Inspect();
+        restore=MakeButton(Words.T("Восстановить","Restore"),802,789,125,false);restore.Click+=(s,e)=>Run(()=>{engine.Restore(folder.Text);Inspect();status.Text=Words.T("Восстановлено состояние из первоначального журнала.","Restored the state recorded in the original backup journal.");});
+        apply=MakeButton(Words.T("Применить","Apply changes"),936,789,153,true);apply.Click+=(s,e)=>Run(()=>{engine.Apply(folder.Text,SelectionMask());status.Text=Words.T("Готово. Выбранные изменения установлены; файлы проверены.","Done. Selected changes were installed and verified.");});
+        BuildRows();Shown+=(s,e)=>Inspect();
+    }
+    Button MakeButton(string text,int x,int y,int width,bool primary){var b=new Button{Text=text,Location=new Point(x,y),Size=new Size(width,38),FlatStyle=FlatStyle.Flat,BackColor=primary?accent:Color.White,ForeColor=primary?Color.White:ink};b.FlatAppearance.BorderColor=primary?accent:line;Controls.Add(b);return b;}
+    void BuildRows(){updating=true;list.Controls.Clear();rows.Clear();int y=0;foreach(var copy in copies){var f=engine.P.features.FirstOrDefault(x=>x.id==copy.id);if(f==null)continue;var row=new FeatureRow(f,copy);row.SetBounds(0,y,346,43);row.Pick+=(s,e)=>SelectFeature(row.Feature.id);row.Box.CheckedChanged+=(s,e)=>{if(updating)return;updating=true;try{if(f.bit==1&&row.Box.Checked)SetBit(2,true);if(f.bit==2&&!row.Box.Checked)SetBit(1,false);if(f.bit==1024&&row.Box.Checked)SetBit(128,true);if(f.bit==128&&!row.Box.Checked)SetBit(1024,false);}finally{updating=false;}UpdateCount();};list.Controls.Add(row);rows.Add(row);y+=49;}updating=false;UpdateCount();SelectFeature(rows.Any(x=>x.Feature.id==selectedId)?selectedId:rows[0].Feature.id);}
+    void SetBit(int bit,bool value){var row=rows.FirstOrDefault(x=>x.Feature.bit==bit);if(row!=null)row.Box.Checked=value;}
+    void UpdateCount(){count.Text=Words.T("Выбрано ","Selected ")+rows.Count(x=>x.Box.Checked)+Words.T(" из "," of ")+rows.Count+Words.T(" возможностей"," features");}
+    int SelectionMask(){return rows.Where(x=>x.Box.Checked).Aggregate(0,(n,x)=>n|x.Feature.bit);}
+    public void SelectFeature(string id){var row=rows.FirstOrDefault(x=>x.Feature.id==id);if(row==null)return;selectedId=id;foreach(var r in rows){r.Selected=r==row;r.BackColor=r.Selected?Color.FromArgb(235,245,250):Color.White;r.Invalidate();}var c=row.Copy;section.Text=Words.T(c.group,c.groupEn).ToUpperInvariant()+Words.T("  /  УПРАВЛЕНИЕ","  /  CONTROLS");heading.Text=Words.T(c.title,c.titleEn);description.Text=Words.T(c.description,c.descriptionEn);conditions.Text=Words.T(c.note,c.noteEn);bindings.Controls.Clear();foreach(var key in Words.English?c.controlsEn:c.controls){bindings.Controls.Add(new Label{Text=key,AutoSize=false,Size=new Size(590,28),Margin=new Padding(0,0,0,4),Padding=new Padding(9,4,4,0),BackColor=Color.FromArgb(234,243,248),ForeColor=accent,Font=new Font("Segoe UI",10,FontStyle.Bold)});}if(row.Top<list.VerticalScroll.Value||row.Bottom>list.VerticalScroll.Value+list.ClientSize.Height)list.ScrollControlIntoView(row);}
+    public void CaptureGallery(string directory){Directory.CreateDirectory(directory);foreach(var row in rows){SelectFeature(row.Feature.id);Application.DoEvents();using(var b=new Bitmap(Width,Height)){DrawToBitmap(b,new Rectangle(0,0,Width,Height));b.Save(Path.Combine(directory,row.Feature.id+".png"));}}}
+    public void VerifyUI(){if(rows.Count!=13||SelectionMask()!=8191)throw new Exception("UI defaults failed");SetBit(2,false);if((SelectionMask()&3)!=0)throw new Exception("Reload dependency failed");SetBit(1,true);if((SelectionMask()&3)!=3)throw new Exception("Cloak dependency failed");SetBit(128,false);if((SelectionMask()&1024)!=0)throw new Exception("Random dependency failed");foreach(var row in rows)row.Box.Checked=true;foreach(var row in rows)SelectFeature(row.Feature.id);if(SelectionMask()!=8191)throw new Exception("Checkbox selection failed");SelectFeature(rows[0].Feature.id);}
+    void Inspect(){try{engine.Check(folder.Text);if(rows.Count!=engine.P.features.Length)BuildRows();status.Text=Words.T("Найден VR-мод ","Detected VR mod ")+engine.P.version+Words.T(". Перед применением закройте игру. Резервные копии сохраняются в папке игры.",". Close the game before applying. Backups are stored in the game folder.");apply.Enabled=true;}catch(Exception ex){status.Text=Words.Error(ex.Message.Split('\n')[0]);apply.Enabled=false;}}
+    void Run(Action action){try{apply.Enabled=restore.Enabled=false;UseWaitCursor=true;action();}catch(Exception ex){status.Text=Words.T("Изменения не применены.","Changes were not applied.");MessageBox.Show(this,Words.Error(ex.Message),Text,MessageBoxButtons.OK,MessageBoxIcon.Warning);}finally{UseWaitCursor=false;restore.Enabled=true;apply.Enabled=true;}}
 }
 
 public static class Program {
     [STAThread] public static int Main(string[] args) {
         try {
+            using(var s=Assembly.GetExecutingAssembly().GetManifestResourceStream("messages.json"))using(var r=new StreamReader(s,Encoding.UTF8))Words.Errors=Engine.Json.Deserialize<Dictionary<string,string>>(r.ReadToEnd());
             var engine=new Engine();
+            if(args.Length>0&&(args[0]=="--render-gallery"||args[0]=="--ui-test")) {
+                Application.EnableVisualStyles();using(var f=new MainWindow()){f.StartPosition=FormStartPosition.Manual;f.Location=new Point(-30000,-30000);f.Show();Application.DoEvents();f.VerifyUI();if(args[0]=="--render-gallery")f.CaptureGallery(args[1]);f.Close();}return 0;
+            }
             if(args.Length>0&&args[0]=="--build-test") {
                 string fixtures=args[1],output=args[2];engine.Select(fixtures);Directory.CreateDirectory(output);
                 for(int mask=0;mask<(1<<engine.P.features.Length);mask++)foreach(var f in engine.P.files) {
@@ -224,6 +287,6 @@ public static class Program {
             if(args.Length>0&&args[0]=="--restore-test") {engine.Restore(args[1]);return 0;}
             if(args.Length>0&&args[0]=="--render-ui") {Application.EnableVisualStyles();using(var f=new MainWindow()){f.StartPosition=FormStartPosition.Manual;f.Location=new Point(-30000,-30000);f.Show();Application.DoEvents();using(var b=new Bitmap(f.Width,f.Height)){f.DrawToBitmap(b,new Rectangle(0,0,b.Width,b.Height));b.Save(args[1]);}f.Close();}return 0;}
             Application.EnableVisualStyles();Application.SetCompatibleTextRenderingDefault(false);Application.Run(new MainWindow());return 0;
-        }catch(Exception ex){if(args.Length>0){File.WriteAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"test-error.txt"),ex.ToString());return 1;}MessageBox.Show(ex.Message);return 1;}
+        }catch(Exception ex){if(args.Length>0){File.WriteAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"test-error.txt"),Words.Error(ex.ToString()));return 1;}MessageBox.Show(Words.Error(ex.Message));return 1;}
     }
 }
